@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from typing import Optional, AsyncGenerator
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..models.requests import ConnectionCreate, DatabaseType
 from ..models.responses import ConnectionResponse, SchemaResponse
@@ -20,7 +20,7 @@ class ConnectionInfo:
     database: str
     connection_string: str
     async_connection_string: str
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     connected_at: Optional[datetime] = None
     is_connected: bool = False
 
@@ -74,7 +74,7 @@ class ConnectionManager:
             raise  # propagate so callers (route handlers / tests) know the connection failed
 
         connection_info.is_connected = True
-        connection_info.connected_at = datetime.utcnow()
+        connection_info.connected_at = datetime.now(timezone.utc)
         self._engines[conn_id] = engine
         self._connections[conn_id] = connection_info
 

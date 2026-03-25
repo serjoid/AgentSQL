@@ -2,6 +2,8 @@
 
 > **v0.5.0** · Tauri v2 · FastAPI · React 19 · SQLAlchemy 2.0 · LiteLLM
 
+[![CI](https://github.com/serjoid/AgentSQL/actions/workflows/ci.yml/badge.svg)](https://github.com/serjoid/AgentSQL/actions/workflows/ci.yml)
+
 Gerenciador de banco de dados desktop com agente AI nativo. Conecte bancos PostgreSQL ou SQLite, escreva SQL com assistência de LLMs e execute queries com segurança — uma trava **Human-in-the-Loop** bloqueia automaticamente operações destrutivas até você confirmar.
 
 ---
@@ -253,7 +255,7 @@ npm run tauri:build
 - [x] **Fase 3** — Query Engine (execução real, HITL gate, preview)
 - [x] **Fase 4** — AI Integration (chat, suggest, analyze, context route)
 - [x] **Fase 4.5** — Tauri Desktop (sidecar, IPC, ícones, build pipeline)
-- [ ] **Fase 5** — Polish & Security (CI/CD, testes E2E, ícones de produção)
+- [x] **Fase 5** — Polish & Security (30 testes, zero warnings, CI/CD GitHub Actions)
 
 ---
 
