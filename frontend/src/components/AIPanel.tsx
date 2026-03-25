@@ -1,59 +1,92 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { useAIStore, useConnectionStore } from '../stores'
+import { api } from '../services/api'
 
 interface AIPanelProps {
   width: number
   onClose: () => void
 }
 
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: string
-}
-
 export default function AIPanel({ width, onClose }: AIPanelProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: 'Hello! I\'m your SQL assistant. I can help you write queries, explain database schemas, and optimize your SQL. How can I help you today?',
-      timestamp: new Date().toISOString(),
-    },
-  ])
+  const {
+    messages,
+    provider,
+    model,
+    providers,
+    isLoading,
+    addMessage,
+    setProvider,
+    setModel,
+    setProviders,
+    setIsLoading,
+    clearMessages,
+  } = useAIStore()
+
+  const { activeConnectionId } = useConnectionStore()
   const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [provider, setProvider] = useState('openai')
-  const [model, setModel] = useState('gpt-4o-mini')
   const [showSettings, setShowSettings] = useState(false)
+  const [apiKey, setApiKey] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const handleSend = async () => {
-    if (!input.trim() || loading) return
+  useEffect(() => {
+    const loadProviders = async () => {
+      try {
+        const data = await api.ai.getProviders()
+        setProviders(data)
+      } catch (err) {
+        console.log('Could not load providers')
+      }
+    }
+    loadProviders()
+  }, [setProviders])
 
-    const userMessage: Message = {
-      role: 'user',
+  const handleConfigure = async () => {
+    if (!apiKey.trim()) return
+    try {
+      await api.ai.configure(provider, apiKey)
+      setApiKey('')
+      const data = await api.ai.getProviders()
+      setProviders(data)
+    } catch (err) {
+      console.error('Failed to configure provider:', err)
+    }
+  }
+
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || isLoading) return
+
+    const userMessage = {
+      role: 'user' as const,
       content: input,
       timestamp: new Date().toISOString(),
     }
 
-    setMessages((prev) => [...prev, userMessage])
+    addMessage(userMessage)
     setInput('')
-    setLoading(true)
+    setIsLoading(true)
 
-    await new Promise((r) => setTimeout(r, 1000))
-
-    const aiResponse: Message = {
-      role: 'assistant',
-      content: `Based on your request, here's a query suggestion:\n\n\`\`\`sql\nSELECT u.email, COUNT(o.id) as order_count\nFROM users u\nLEFT JOIN orders o ON u.id = o.user_id\nGROUP BY u.id, u.email\nORDER BY order_count DESC;\n\`\`\`\n\nThis query will show you the number of orders per user. Would you like me to explain any part of it?`,
-      timestamp: new Date().toISOString(),
+    try {
+      const response = await api.ai.chat(provider, model, input, !!activeConnectionId)
+      
+      addMessage({
+        role: 'assistant',
+        content: response.response,
+        timestamp: response.timestamp,
+      })
+    } catch (err) {
+      addMessage({
+        role: 'assistant',
+        content: `Error: ${err instanceof Error ? err.message : 'Failed to get response'}`,
+        timestamp: new Date().toISOString(),
+      })
+    } finally {
+      setIsLoading(false)
     }
-
-    setMessages((prev) => [...prev, aiResponse])
-    setLoading(false)
-  }
+  }, [input, isLoading, provider, model, activeConnectionId, addMessage, setIsLoading])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -61,6 +94,9 @@ export default function AIPanel({ width, onClose }: AIPanelProps) {
       handleSend()
     }
   }
+
+  const currentProvider = providers.find((p) => p.provider === provider)
+  const isConfigured = currentProvider?.is_configured ?? false
 
   return (
     <div
@@ -96,34 +132,74 @@ export default function AIPanel({ width, onClose }: AIPanelProps) {
       </div>
 
       {showSettings && (
-        <div className="px-4 py-3 border-b border-border-primary bg-bg-tertiary">
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs text-text-muted mb-1">Provider</label>
-              <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value)}
-                className="w-full bg-bg-primary border border-border-primary rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-              >
-                <option value="openai">OpenAI</option>
-                <option value="gemini">Gemini</option>
-                <option value="deepseek">DeepSeek</option>
-                <option value="anthropic">Anthropic</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-text-muted mb-1">Model</label>
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="w-full bg-bg-primary border border-border-primary rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-              >
-                <option value="gpt-4o-mini">gpt-4o-mini</option>
-                <option value="gpt-4o">gpt-4o</option>
-                <option value="gpt-4-turbo">gpt-4-turbo</option>
-              </select>
-            </div>
+        <div className="px-4 py-3 border-b border-border-primary bg-bg-tertiary space-y-3">
+          <div>
+            <label className="block text-xs text-text-muted mb-1">Provider</label>
+            <select
+              value={provider}
+              onChange={(e) => setProvider(e.target.value)}
+              className="w-full bg-bg-primary border border-border-primary rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent-primary"
+            >
+              {providers.map((p) => (
+                <option key={p.provider} value={p.provider}>
+                  {p.provider} {p.is_configured ? '✓' : ''}
+                </option>
+              ))}
+            </select>
           </div>
+
+          <div>
+            <label className="block text-xs text-text-muted mb-1">Model</label>
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="w-full bg-bg-primary border border-border-primary rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent-primary"
+            >
+              {currentProvider?.models.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {!isConfigured && (
+            <div>
+              <label className="block text-xs text-text-muted mb-1">API Key</label>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={`Enter ${provider} API key`}
+                  className="flex-1 bg-bg-primary border border-border-primary rounded px-2 py-1.5 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary"
+                />
+                <button
+                  onClick={handleConfigure}
+                  disabled={!apiKey.trim()}
+                  className="px-3 py-1.5 bg-accent-primary hover:bg-accent-secondary text-white text-sm rounded disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isConfigured && (
+            <div className="flex items-center gap-2 text-xs text-green-400">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              API key configured
+            </div>
+          )}
+
+          <button
+            onClick={clearMessages}
+            className="w-full text-xs text-text-muted hover:text-text-secondary py-1"
+          >
+            Clear conversation
+          </button>
         </div>
       )}
 
@@ -144,7 +220,7 @@ export default function AIPanel({ width, onClose }: AIPanelProps) {
             </div>
           </div>
         ))}
-        {loading && (
+        {isLoading && (
           <div className="flex justify-start">
             <div className="bg-bg-tertiary rounded-lg px-3 py-2">
               <div className="flex items-center gap-2">
@@ -165,13 +241,13 @@ export default function AIPanel({ width, onClose }: AIPanelProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about your data..."
+            placeholder={isConfigured ? 'Ask about your data...' : 'Configure API key first...'}
             className="flex-1 bg-bg-primary border border-border-primary rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary"
-            disabled={loading}
+            disabled={isLoading || !isConfigured}
           />
           <button
             onClick={handleSend}
-            disabled={loading || !input.trim()}
+            disabled={isLoading || !input.trim() || !isConfigured}
             className="px-4 py-2 bg-accent-primary hover:bg-accent-secondary text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

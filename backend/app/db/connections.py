@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, MetaData, inspect
+from sqlalchemy import create_engine, MetaData, inspect, text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 from typing import Optional, AsyncGenerator
@@ -9,6 +9,7 @@ from datetime import datetime
 from ..models.requests import ConnectionCreate, DatabaseType
 from ..models.responses import ConnectionResponse, SchemaResponse
 from ..core.security import get_security_manager
+from .metadata import schema_extractor
 
 
 @dataclass
@@ -68,7 +69,7 @@ class ConnectionManager:
             engine = create_async_engine(async_conn_string, echo=False)
             
             async with engine.begin() as conn:
-                await conn.execute("SELECT 1")
+                await conn.execute(text("SELECT 1"))
             
             connection_info.is_connected = True
             connection_info.connected_at = datetime.utcnow()
@@ -129,41 +130,8 @@ class ConnectionManager:
     async def get_schema(self, conn_id: str) -> Optional[SchemaResponse]:
         if conn_id not in self._engines:
             return None
-        
         engine = self._engines[conn_id]
-        
-        async with engine.connect() as conn:
-            def _inspect(connection):
-                inspector = inspect(connection.sync_connection)
-                
-                tables = []
-                for table_name in inspector.get_table_names():
-                    columns = []
-                    for column in inspector.get_columns(table_name):
-                        columns.append({
-                            "name": column["name"],
-                            "type": str(column["type"]),
-                            "nullable": column.get("nullable", True),
-                            "default": column.get("default"),
-                            "primary_key": column.get("primary_key", False)
-                        })
-                    
-                    tables.append({
-                        "name": table_name,
-                        "columns": columns
-                    })
-                
-                views = inspector.get_view_names()
-                
-                return SchemaResponse(
-                    connection_id=conn_id,
-                    tables=tables,
-                    views=views,
-                    functions=[]
-                )
-            
-            result = await conn.run_sync(_inspect)
-            return result
+        return await schema_extractor.extract(engine, conn_id)
 
 
 connection_manager = ConnectionManager()

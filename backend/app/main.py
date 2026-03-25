@@ -6,7 +6,8 @@ import logging
 
 from .core.config import settings
 from .models.responses import HealthResponse, ErrorResponse
-from .api.routes import query, ai, connection
+from .api.routes import query, ai, connection, context
+
 
 logging.basicConfig(level=logging.INFO if settings.DEBUG else logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -77,6 +78,7 @@ async def health_check():
 app.include_router(query.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
 app.include_router(connection.router, prefix="/api")
+app.include_router(context.router, prefix="/api")
 
 
 if __name__ == "__main__":

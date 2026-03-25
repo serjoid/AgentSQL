@@ -325,29 +325,130 @@ class QueryAnalysis:
 
 ## Development Phases
 
-### Phase 1: Backend Foundation (Current)
+### Phase 1: Backend Foundation ✅
 - Week 1-2: Project scaffolding, FastAPI setup, query filter, LiteLLM router
 
-### Phase 2: Database Layer
+### Phase 2: Database Layer ✅
 - Week 3-4: Connection management, SQLAlchemy, schema explorer
 
-### Phase 3: Query Engine
+### Phase 3: Query Engine ✅
 - Week 5-6: SQL Editor, execution, HITL modal, result grid
 
-### Phase 4: AI Integration
+### Phase 4: AI Integration ✅
 - Week 7-8: LiteLLM integration, chat panel, context assembly
+
+### Phase 4.5: Tauri Desktop Integration ✅
+- Tauri v2 scaffolding, sidecar wiring, build pipeline
 
 ### Phase 5: Polish & Security
 - Week 9-10: Testing, error handling, documentation
 
 ## Version History
 
-| Version | Date       | Changes                                              |
+| Version | Date | Changes |
 |---------|------------|------------------------------------------------------|
-| 0.1.0   | 2025-03-25 | Initial backend scaffolding                          |
-| 0.2.0   | 2025-03-25 | Frontend setup, base components, API client          |
+| 0.1.0 | 2025-03-25 | Initial backend scaffolding |
+| 0.2.0 | 2025-03-25 | Frontend setup, base components, API client |
+| 0.3.0 | 2025-03-25 | Zustand state, HITL modal, connection modal, SQL highlighting |
+| 0.4.0 | 2026-03-25 | Tauri v2 integration — desktop shell, sidecar pipeline |
 
 ## Changelog
+
+### v0.4.0 - Tauri Desktop Integration (2026-03-25)
+
+#### New Files
+| File | Purpose |
+|------|---------|
+| `frontend/src-tauri/Cargo.toml` | Rust crate definition — declares Tauri v2 + plugin deps |
+| `frontend/src-tauri/build.rs` | Tauri build script (required by tauri-build) |
+| `frontend/src-tauri/src/main.rs` | Binary entry point — calls `sgbd_lib::run()` |
+| `frontend/src-tauri/src/lib.rs` | App setup: sidecar spawn (release only), DevTools (debug only) |
+| `frontend/src-tauri/tauri.conf.json` | Window config, build commands, bundle settings |
+| `frontend/src-tauri/capabilities/default.json` | Tauri v2 permission grants (window, shell, dialog) |
+| `backend/pyproject.toml` | Package metadata + PyInstaller hidden-imports config |
+| `backend/scripts/build_sidecar.py` | Builds the Python backend as a platform-specific sidecar binary |
+
+#### Modified Files
+| File | Change |
+|------|--------|
+| `frontend/vite.config.ts` | Added `TAURI_DEV_HOST` support, env prefix, per-platform build targets |
+| `frontend/package.json` | Bumped to v0.4.0; added `@tauri-apps/api ^2`, `@tauri-apps/cli ^2`; added `tauri`, `tauri:dev`, `tauri:build` scripts |
+| `.gitignore` | Added rules for `src-tauri/target/`, `src-tauri/gen/`, `src-tauri/binaries/`, PyInstaller artifacts |
+
+#### Architecture: Sidecar Pattern
+In **development**, the Python backend runs separately:
+```
+Terminal 1: cd backend && uvicorn app.main:app --reload
+Terminal 2: cd frontend && npm run tauri:dev
+```
+
+In **production**, PyInstaller bundles the backend as a platform-specific binary that Tauri spawns on startup:
+```
+backend/scripts/build_sidecar.py
+  → frontend/src-tauri/binaries/backend-{triple}.exe  (Windows)
+  → frontend/src-tauri/binaries/backend-{triple}      (Linux/macOS)
+
+npm run tauri:build
+  → Bundles frontend + Rust shell + sidecar into a single installer
+```
+
+#### Tauri Commands (IPC)
+| Command | Returns | Purpose |
+|---------|---------|---------|
+| `get_backend_url` | `"http://localhost:8000"` | Frontend can query the backend URL at runtime |
+
+#### Prerequisites to run
+- **Rust** toolchain: `rustup` + `cargo`
+- **Node.js** ≥ 18 + `npm install` inside `frontend/`
+- **Python** 3.11+ with `pip install -r backend/requirements.txt`
+- **OS deps** (Linux only): `libwebkit2gtk-4.1-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`
+
+---
+
+### v0.3.0 - State Management & UI Components (2025-03-25)
+
+#### New Features
+- **Zustand State Management**: Centralized stores for:
+  - `useConnectionStore`: Database connections and schema
+  - `useQueryStore`: Current query, history, results
+  - `useAIStore`: AI messages, provider, model selection
+  - `useModalStore`: Modal visibility states
+
+#### New Components
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `ConfirmationModal` | `src/components/modals/ConfirmationModal.tsx` | HITL confirmation for destructive queries |
+| `ConnectionModal` | `src/components/modals/ConnectionModal.tsx` | Database connection dialog |
+| `SQLEditor` | `src/components/SQLEditor.tsx` | Custom SQL editor with syntax highlighting |
+
+#### SQLEditor Features
+- Line numbers
+- Syntax highlighting for SQL keywords, strings, numbers, comments
+- Tab key support (2 spaces)
+- Ctrl+Enter to execute
+- Custom dark theme colors
+
+#### ConfirmationModal Features
+- Operation type badge with color coding
+- Affected tables display
+- Full query preview
+- Execute/Cancel buttons
+- Escape key to close
+
+#### ConnectionModal Features
+- PostgreSQL and SQLite support
+- Test connection button
+- Form validation
+- Connection status feedback
+
+#### API Integration
+- All components now use real backend API
+- Query execution flow:
+  1. Validate query via `/api/query/validate`
+  2. If destructive → show ConfirmationModal
+  3. If safe → execute directly
+- Schema fetching on connection select
+- AI provider configuration in panel
 
 ### v0.2.0 - Frontend Foundation (2025-03-25)
 
@@ -438,5 +539,5 @@ sgbd/
 
 ---
 
-**Last Updated**: 2025-03-25
+**Last Updated**: 2026-03-25
 **Author**: AI Agent (System Architecture)

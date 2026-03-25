@@ -7,3 +7,17 @@ __pycache__/
 .venv/
 venv/
 .DS_Store
+
+# Rust / Tauri
+frontend/src-tauri/target/
+frontend/src-tauri/gen/
+frontend/src-tauri/WixTools/
+Cargo.lock
+
+# Tauri sidecar binaries (built by scripts/build_sidecar.py)
+frontend/src-tauri/binaries/
+
+# PyInstaller
+backend/build/
+backend/dist/
+backend/**/*.spec

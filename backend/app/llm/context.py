@@ -59,17 +59,26 @@ class ContextManager:
             maxlen=settings.MAX_CHAT_HISTORY
         )
         self._current_schema: Optional[SchemaInfo] = None
-    
+        self._raw_schema_text: Optional[str] = None
+
     def set_schema(self, schema: SchemaInfo) -> None:
         self._current_schema = schema
-    
+        self._raw_schema_text = None  # clear raw text when structured schema is set
+
     def get_schema(self) -> Optional[SchemaInfo]:
         return self._current_schema
-    
+
+    def set_schema_context(self, text: str) -> None:
+        """Set a raw text schema context (used by the context route)."""
+        self._raw_schema_text = text
+
     def get_schema_context(self) -> str:
-        if self._current_schema:
+        if self._raw_schema_text is not None:
+            return self._raw_schema_text or "No schema information available."
+        if self._current_schema is not None:
             return self._current_schema.to_context_string()
         return "No schema information available."
+
     
     def add_query_to_history(self, item: QueryHistoryItem) -> None:
         self._query_history.append(item)
