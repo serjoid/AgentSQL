@@ -131,11 +131,11 @@ npm run tauri dev
 
 | Provider | Models |
 |----------|--------|
-| OpenAI | gpt-4o, gpt-4o-mini, gpt-4-turbo |
-| Gemini | gemini-1.5-pro, gemini-1.5-flash |
-| DeepSeek | deepseek-chat, deepseek-coder |
-| Nvidia | llama-3.1-nemotron-70b |
-| Anthropic | claude-3-5-sonnet, claude-3-haiku |
+| OpenAI | gpt-5, gpt-5-mini, o1-preview |
+| Gemini | gemini-3-pro, gemini-3-flash |
+| DeepSeek | deepseek-v3, deepseek-r1 |
+| Nvidia | GLM 5, Minimax 2.5, Qwen 3.5 |
+| Anthropic | claude-4.6-sonnet, claude-4.6-opus |
 
 ## Development Phases
 
