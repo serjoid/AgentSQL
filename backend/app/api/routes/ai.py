@@ -2,11 +2,11 @@ from fastapi import APIRouter, HTTPException
 from typing import List
 from datetime import datetime
 
-from ..models.requests import AIConfig, AIChat, AIQuerySuggestion, AIAnalyzeQuery
-from ..models.responses import AIProviderResponse, AIChatResponse, AIAnalysisResponse, ErrorResponse
-from ..core.security import key_store
-from ..llm.router import llm_router
-from ..llm.context import context_manager
+from ...models.requests import AIConfig, AIChat, AIQuerySuggestion, AIAnalyzeQuery
+from ...models.responses import AIProviderResponse, AIChatResponse, AIAnalysisResponse, ErrorResponse
+from ...core.security import key_store
+from ...llm.router import llm_router
+from ...llm.context import context_manager
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 

@@ -65,28 +65,26 @@ class ConnectionManager:
             async_connection_string=security.encrypt(async_conn_string)
         )
         
+        engine = create_async_engine(async_conn_string, echo=False)
         try:
-            engine = create_async_engine(async_conn_string, echo=False)
-            
-            async with engine.begin() as conn:
-                await conn.execute(text("SELECT 1"))
-            
-            connection_info.is_connected = True
-            connection_info.connected_at = datetime.utcnow()
-            self._engines[conn_id] = engine
-            
-        except Exception as e:
-            connection_info.is_connected = False
-        
+            async with engine.begin() as db_conn:
+                await db_conn.execute(text("SELECT 1"))
+        except Exception:
+            await engine.dispose()
+            raise  # propagate so callers (route handlers / tests) know the connection failed
+
+        connection_info.is_connected = True
+        connection_info.connected_at = datetime.utcnow()
+        self._engines[conn_id] = engine
         self._connections[conn_id] = connection_info
-        
+
         return ConnectionResponse(
             id=conn_id,
-            name=conn.name,
-            db_type=conn.db_type.value,
-            database=conn.database,
+            name=connection_info.name,
+            db_type=connection_info.db_type,
+            database=connection_info.database,
             connected=connection_info.is_connected,
-            connected_at=connection_info.connected_at
+            connected_at=connection_info.connected_at,
         )
     
     async def get_connection(self, conn_id: str) -> Optional[ConnectionInfo]:

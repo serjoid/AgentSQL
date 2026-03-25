@@ -13,10 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy import text as sql_text
 from datetime import datetime
 
-from ..models.requests import QueryValidate, QueryExecute
-from ..models.responses import QueryValidationResponse, QueryResultResponse
-from ..core.query_filter import query_filter
-from ..db.connections import connection_manager
+from ...models.requests import QueryValidate, QueryExecute
+from ...models.responses import QueryValidationResponse, QueryResultResponse
+from ...core.query_filter import query_filter
+from ...db.connections import connection_manager
 from ..dependencies import get_engine
 
 router = APIRouter(prefix="/query", tags=["query"])

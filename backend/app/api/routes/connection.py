@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
 
-from ..models.requests import ConnectionCreate
-from ..models.responses import ConnectionResponse, SchemaResponse
-from ..db.connections import connection_manager
+from ...models.requests import ConnectionCreate
+from ...models.responses import ConnectionResponse, SchemaResponse
+from ...db.connections import connection_manager
 
 router = APIRouter(prefix="/connection", tags=["connection"])
 

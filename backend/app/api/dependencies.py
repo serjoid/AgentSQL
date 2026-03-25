@@ -6,7 +6,7 @@ repetitive connection-lookup boilerplate and get automatic
 404 / 503 responses when a connection is missing or idle.
 """
 
-from fastapi import Depends, HTTPException, Query
+from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ..db.connections import connection_manager, ConnectionInfo
@@ -18,9 +18,9 @@ from ..db.connections import connection_manager, ConnectionInfo
 
 
 async def get_connection_info(
-    connection_id: str = Query(..., description="Active connection UUID"),
+    connection_id: str,
 ) -> ConnectionInfo:
-    """Resolve a connection_id to a live ConnectionInfo or raise 404."""
+    """Resolve a connection_id (path or query param) to a live ConnectionInfo or raise 404."""
     conn = await connection_manager.get_connection(connection_id)
     if conn is None:
         raise HTTPException(
