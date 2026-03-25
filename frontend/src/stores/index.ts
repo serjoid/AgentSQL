@@ -76,8 +76,8 @@ interface AIPanelState {
 
 export const useAIStore = create<AIPanelState>((set) => ({
   messages: [],
-  provider: 'openai',
-  model: 'gpt-4o-mini',
+  provider: '',
+  model: '',
   providers: [],
   isLoading: false,
   addMessage: (message) =>

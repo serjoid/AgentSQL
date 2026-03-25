@@ -60,23 +60,23 @@ export default function SQLEditor({ value, onChange, onExecute, disabled }: SQLE
 
     keywords.forEach((kw) => {
       const regex = new RegExp(`\\b(${kw})\\b`, 'gi')
-      highlighted = highlighted.replace(regex, '<span class="text-purple-400 font-semibold">$1</span>')
+      highlighted = highlighted.replace(regex, '<span style="color:#9B51E0;font-weight:600">$1</span>')
     })
 
     highlighted = highlighted
-      .replace(/'([^']*)'/g, '<span class="text-green-400">\'$1\'</span>')
-      .replace(/"([^"]*)"/g, '<span class="text-green-400">"$1"</span>')
-      .replace(/\b(\d+)\b/g, '<span class="text-orange-400">$1</span>')
-      .replace(/(--[^\n]*)/g, '<span class="text-gray-500 italic">$1</span>')
+      .replace(/'([^']*)'/g, '<span style="color:#00E5FF">\'$1\'</span>')
+      .replace(/"([^"]*)"/g, '<span style="color:#00E5FF">"$1"</span>')
+      .replace(/\b(\d+)\b/g, '<span style="color:#FBBF24">$1</span>')
+      .replace(/(--[^\n]*)/g, '<span style="color:#5C5C66;font-style:italic">$1</span>')
 
     return highlighted
   }
 
   return (
-    <div className="relative flex-1 flex font-mono text-sm bg-bg-primary overflow-hidden">
+    <div className="relative flex-1 flex font-mono text-sm bg-bg-deep overflow-hidden">
       <div
         ref={lineNumbersRef}
-        className="flex-shrink-0 py-4 pr-2 pl-4 text-right text-text-muted select-none overflow-hidden border-r border-border-secondary"
+        className="flex-shrink-0 py-4 pr-2 pl-4 text-right text-text-muted select-none overflow-hidden border-r border-border-subtle"
         style={{ minWidth: '50px' }}
       >
         {Array.from({ length: lineCount }, (_, i) => (

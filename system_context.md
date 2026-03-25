@@ -68,14 +68,83 @@ npm run tauri:build
 |-------------------|--------------------------------------|--------------|
 | Desktop           | Tauri                                | v2           |
 | Frontend          | React + TypeScript                   | 19 / 5       |
-| Estilo            | TailwindCSS                          | v4           |
-| Editor SQL        | Monaco Editor                        | @4.7         |
+| Estilo            | TailwindCSS + Design System custom   | v4           |
+| Editor SQL        | Custom SQLEditor (syntax highlight)  | —            |
 | State             | Zustand                              | v5           |
 | Backend           | Python + FastAPI                     | 3.11+ / 0.109+ |
 | ORM               | SQLAlchemy (async)                   | 2.0          |
 | Drivers           | asyncpg (PostgreSQL), aiosqlite      | —            |
 | AI Router         | LiteLLM                              | ≥1.20        |
 | Desktop Shell     | Rust (tauri-plugin-shell, -dialog)   | —            |
+
+---
+
+## Design System (v0.7.0)
+
+### Identidade Visual
+
+Interface dark mode refinada, inspirada em ferramentas profissionais como Linear, Vercel e DataGrip.
+
+### Paleta de Cores
+
+```
+Superfícies (sistema de elevação):
+  --bg-deep:     #1A1A1D   (canvas base)
+  --bg-surface:  #222226   (painéis, sidebar)
+  --bg-elevated: #2A2A2F   (toolbars, headers)
+  --bg-hover:    #32323A   (hover states)
+  --bg-input:    #18181B   (inputs inset)
+
+Acentos:
+  --accent-cyan:       #00E5FF   (primário, active states)
+  --accent-cyan-dim:   rgba(0,229,255,0.12)
+  --accent-purple:     #9B51E0   (SQL keywords, brand)
+  --accent-purple-dim: rgba(155,81,224,0.12)
+
+Texto:
+  --text-primary:   #E8E8ED   (texto principal)
+  --text-secondary: #9898A0   (labels, suporte)
+  --text-muted:     #5C5C66   (metadata, placeholders)
+
+Bordas (rgba para blending):
+  --border-subtle: rgba(255,255,255,0.06)
+  --border-medium: rgba(255,255,255,0.10)
+  --border-strong: rgba(255,255,255,0.16)
+
+Semânticas:
+  --success: #34D399   --warning: #FBBF24   --error: #F87171   --info: #00E5FF
+```
+
+### Tipografia
+
+- **UI**: Inter, system-ui, sans-serif
+- **Código**: Geist Mono, JetBrains Mono, Fira Code, monospace
+
+### Layout da Interface
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Title Bar: [≡] [A] AgentSQL — AI-Powered DB Manager    [AI ⚡] │
+├──────┬──────────────┬───────────────────────┬───────────────────┤
+│ Icon │   Sidebar    │    SQL Editor          │   AI Assistant    │
+│ Strip│   Tree View  │    (syntax highlight)  │   Panel           │
+│ 48px │   ~232px     │    flex-1              │   ~350px          │
+│      │              ├───────────────────────┤                   │
+│      │              │    Results Grid        │                   │
+│      │              │    + footer bar        │                   │
+├──────┴──────────────┴───────────────────────┴───────────────────┤
+│ Status Bar: [conn] [● Online] [latency] [AgentSQL v0.7.0]      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Syntax Highlighting (SQLEditor)
+
+| Elemento     | Cor                    |
+|-------------|------------------------|
+| Keywords    | `#9B51E0` (purple)     |
+| Strings     | `#00E5FF` (cyan)       |
+| Numbers     | `#FBBF24` (amber)      |
+| Comments    | `#5C5C66` (muted)      |
 
 ---
 
@@ -120,21 +189,21 @@ ConfirmationModal  Execute direto
 
 ---
 
-## Estrutura de Diretórios (v0.5.0)
+## Estrutura de Diretórios (v0.7.0)
 
 ```
 AgentSQL/
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── Layout.tsx              # Layout 3 painéis redimensionáveis
-│   │   │   ├── Sidebar.tsx             # Schema explorer em árvore
-│   │   │   ├── Editor.tsx              # SQL editor + results grid
-│   │   │   ├── AIPanel.tsx             # Chat AI com seleção de provider/model
-│   │   │   ├── SQLEditor.tsx           # Monaco com syntax highlighting
+│   │   │   ├── Layout.tsx              # Layout master: TitleBar + IconStrip + StatusBar + painéis
+│   │   │   ├── Sidebar.tsx             # Schema explorer: tree view com type badges coloridos
+│   │   │   ├── Editor.tsx              # SQL editor + results grid + footer (rows/time/HITL)
+│   │   │   ├── AIPanel.tsx             # Assistant: chat bubbles com avatares, settings dropdown
+│   │   │   ├── SQLEditor.tsx           # Editor SQL com syntax highlighting (purple/cyan/amber)
 │   │   │   └── modals/
-│   │   │       ├── ConfirmationModal.tsx   # HITL — confirmar query destrutiva
-│   │   │       └── ConnectionModal.tsx     # Nova conexão (PG / SQLite)
+│   │   │       ├── ConfirmationModal.tsx   # HITL — confirmar query destrutiva (semantic colors)
+│   │   │       └── ConnectionModal.tsx     # Nova conexão (PG / SQLite) — rounded-xl, cyan accent
 │   │   ├── stores/
 │   │   │   └── index.ts                # Zustand: useConnectionStore,
 │   │   │                               # useQueryStore, useAIStore, useModalStore
@@ -187,6 +256,11 @@ AgentSQL/
 │   ├── requirements.txt                # prod + dev deps (pytest, httpx, pytest-asyncio)
 │   ├── pyproject.toml                  # asyncio_mode=auto, testpaths, pythonpath
 │   └── pyrightconfig.json              # Configuração Pylance/pyright
+│
+├── docs/
+│   └── superpowers/
+│       └── specs/
+│           └── 2026-03-25-ui-redesign-design.md  # Spec do redesign da interface
 │
 ├── system_context.md
 └── README.md
@@ -319,6 +393,23 @@ Singleton com deques bounded:
 - `_query_history` — `deque(maxlen=MAX_QUERY_HISTORY)` (default 50)
 - `_chat_history` — `deque(maxlen=MAX_CHAT_HISTORY)` (default 20)
 
+### `Layout.tsx` — Componentes de Layout (v0.7.0)
+
+```
+Layout (master)
+├── TitleBar        — Branding, hamburger menu, AI toggle button
+├── IconStrip       — Navegação vertical (48px): Explorer, Schemas, Connections, Settings, User
+│                     Active state: cyan accent pill (bg-accent-cyan-dim)
+├── Sidebar         — Tree view: conexões → schemas → tabelas → colunas
+│                     Type badges coloridos: int=blue, text=emerald, numeric=amber, bool=pink
+│                     Seções colapsáveis: Tables, Views, Functions
+├── Editor          — Toolbar com Execute (cyan), SQLEditor, ResultsGrid + footer
+│                     Footer: row count, execution time (perf_counter), HITL status
+├── AIPanel         — Settings (Provider/Model/API Key), Chat com avatares (AI=purple, User=circle)
+│                     Bubbles: user=cyan-tinted, assistant=surface-colored
+└── StatusBar       — Conexão ativa, status Online/Offline, versão
+```
+
 ---
 
 ## Configuração
@@ -407,7 +498,9 @@ cd frontend && npm run tauri icon -- logo.png
 | 3    | Query Engine — execução real, preview, HITL gate             | ✅ Completo   |
 | 4    | AI Integration — chat, suggest, analyze, context route       | ✅ Completo   |
 | 4.5  | Tauri Desktop — sidecar, IPC, ícones, build pipeline         | ✅ Completo   |
-| 5    | Polish & Security — 30 testes, bug fixes, CI/CD, docs        | 🔄 Em progresso |
+| 5    | Polish & Security — 30 testes, bug fixes, CI/CD, docs        | ✅ Completo   |
+| 6    | UX & Native Feel — Tema Dark, Tailwind v4, Sidebar, AIPanel  | ✅ Completo   |
+| 7    | UI Redesign — Design system, elevação, cyan/purple accents, layout profissional | ✅ Completo   |
 
 ---
 
@@ -420,9 +513,13 @@ cd frontend && npm run tauri icon -- logo.png
 | 0.3.0  | 2025-03-25 | Zustand stores, HITL modal, ConnectionModal, SQL highlighting               |
 | 0.4.0  | 2026-03-25 | Tauri v2, metadata.py, dependencies.py, context route, execução real, ícones |
 | 0.5.0  | 2026-03-25 | 30 testes passando; bug fixes: variable shadowing, imports relativos, `Query` vs path param |
+| 0.6.0  | 2026-03-25 | Renomeando de SGBD para AgentSQL, ícone dedicado, Tailwind CSS v4 custom variables, AIPanel unificado e fix no sidecar |
+| 0.7.0  | 2026-03-25 | **UI Redesign completo**: design system com tokens (cyan/purple), layout com TitleBar + IconStrip + StatusBar, tree view com type badges, chat bubbles com avatares, syntax highlighting (purple keywords, cyan strings), results grid com footer (rows/time/HITL), modals redesenhados com semantic colors, tipografia Geist Mono |
+| 0.8.0  | 2026-03-25 | Bug fixes: backend sidecar startup crash (`run.py` wrapper, `--collect-all litellm`), frontend silenciando erros de conexão no `ConnectionModal`, ajustes de padding no AIPanel para não colar na borda da janela. |
+| 0.9.0  | 2026-03-25 | **Dynamic AI Models**: Implementação de busca dinâmica de modelos via API (OpenAI/Gemini/DeepSeek), remoção de pre-fill de modelos (campo Model oculto até configuração), suporte a input de texto livre (datalist) para modelos customizados, e relaxamento de CORS para Tauri v2. |
 
 ---
 
 **Last Updated**: 2026-03-25
-**Version**: 0.5.0
+**Version**: 0.9.0
 **Author**: AI Agent (System Architecture)

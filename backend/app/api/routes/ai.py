@@ -14,10 +14,14 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 @router.get("/providers", response_model=List[AIProviderResponse])
 async def get_providers():
     providers = llm_router.get_available_providers()
-    result = []
+    import asyncio
     
-    for provider in providers:
-        models = llm_router.get_models_for_provider(provider)
+    # Fetch models for all providers concurrently
+    tasks = [llm_router.fetch_remote_models(provider) for provider in providers]
+    models_lists = await asyncio.gather(*tasks)
+    
+    result = []
+    for provider, models in zip(providers, models_lists):
         is_configured = key_store.has_key(provider)
         
         result.append(AIProviderResponse(

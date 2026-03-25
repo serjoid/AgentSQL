@@ -2,21 +2,22 @@ import litellm
 from litellm import acompletion
 from typing import AsyncGenerator, Optional
 import json
+import httpx
 
 from ..core.security import key_store
 
 
 PROVIDERS = {
     'openai': {
-        'models': ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+        'models': ['gpt-4o', 'gpt-4o-mini', 'gpt-4.5-preview', 'o1', 'o3-mini'],
         'prefix': 'openai'
     },
     'gemini': {
-        'models': ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro'],
+        'models': ['gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'],
         'prefix': 'gemini'
     },
     'deepseek': {
-        'models': ['deepseek-chat', 'deepseek-coder'],
+        'models': ['deepseek-chat', 'deepseek-reasoner'],
         'prefix': 'deepseek'
     },
     'nvidia': {
@@ -24,7 +25,7 @@ PROVIDERS = {
         'prefix': 'nvidia'
     },
     'anthropic': {
-        'models': ['claude-3-5-sonnet', 'claude-3-haiku', 'claude-3-opus'],
+        'models': ['claude-3-7-sonnet', 'claude-3-5-sonnet', 'claude-3-5-haiku', 'claude-4.6'],
         'prefix': 'anthropic'
     }
 }
@@ -42,6 +43,46 @@ class LLMRouter:
         if config:
             return config['models']
         return []
+
+    async def fetch_remote_models(self, provider: str) -> list[str]:
+        provider = provider.lower()
+        config = self._provider_configs.get(provider)
+        if not config:
+            return []
+            
+        api_key = key_store.get_key(provider)
+        fallback_models = config['models']
+        if not api_key:
+            return fallback_models
+            
+        try:
+            async with httpx.AsyncClient() as client:
+                if provider == 'openai':
+                    r = await client.get('https://api.openai.com/v1/models', headers={'Authorization': f'Bearer {api_key}'})
+                    if r.status_code == 200:
+                        data = r.json()
+                        # Filter to chat completion models usually (like gpt-, o1, o3)
+                        return sorted([m['id'] for m in data.get('data', []) if m['id'].startswith(('gpt-', 'o1', 'o3'))], reverse=True)
+                
+                elif provider == 'deepseek':
+                    r = await client.get('https://api.deepseek.com/models', headers={'Authorization': f'Bearer {api_key}'})
+                    if r.status_code == 200:
+                        data = r.json()
+                        return [m['id'] for m in data.get('data', [])]
+                
+                elif provider == 'gemini':
+                    r = await client.get(f'https://generativelanguage.googleapis.com/v1beta/models?key={api_key}')
+                    if r.status_code == 200:
+                        data = r.json()
+                        models = [m['name'].replace('models/', '') for m in data.get('models', []) if 'generateContent' in m.get('supportedGenerationMethods', [])]
+                        return sorted(models, reverse=True)
+                
+                # Anthropic doesn't have a public GET /models endpoint yet, and generic fallbacks
+                return fallback_models
+        except Exception as e:
+            pass
+            
+        return fallback_models
     
     def _normalize_model(self, provider: str, model: str) -> str:
         config = self._provider_configs.get(provider.lower())

@@ -1,18 +1,44 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-:root {
-  --bg-primary: #0f0f0f;
-  --bg-secondary: #1a1a1a;
-  --bg-tertiary: #252525;
-  --border-primary: #333333;
-  --border-secondary: #444444;
-  --text-primary: #ffffff;
-  --text-secondary: #a0a0a0;
-  --text-muted: #666666;
-  --accent-primary: #3b82f6;
-  --accent-secondary: #2563eb;
+@theme {
+  /* AgentSQL — Refined Dark Theme */
+  /* Surfaces (elevation system) */
+  --color-bg-deep: #1A1A1D;
+  --color-bg-surface: #222226;
+  --color-bg-elevated: #2A2A2F;
+  --color-bg-hover: #32323A;
+  --color-bg-input: #18181B;
+
+  /* Accents */
+  --color-accent-cyan: #00E5FF;
+  --color-accent-cyan-dim: rgba(0, 229, 255, 0.12);
+  --color-accent-purple: #9B51E0;
+  --color-accent-purple-dim: rgba(155, 81, 224, 0.12);
+
+  /* Text hierarchy */
+  --color-text-primary: #E8E8ED;
+  --color-text-secondary: #9898A0;
+  --color-text-muted: #5C5C66;
+
+  /* Borders (rgba for blending) */
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+  --color-border-medium: rgba(255, 255, 255, 0.10);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+
+  /* Semantic */
+  --color-success: #34D399;
+  --color-warning: #FBBF24;
+  --color-error: #F87171;
+  --color-info: #00E5FF;
+
+  /* Legacy aliases for gradual migration */
+  --color-bg-primary: #1A1A1D;
+  --color-bg-secondary: #222226;
+  --color-bg-tertiary: #2A2A2F;
+  --color-border-primary: rgba(255, 255, 255, 0.08);
+  --color-border-secondary: rgba(255, 255, 255, 0.12);
+  --color-accent-primary: #00E5FF;
+  --color-accent-secondary: #9B51E0;
 }
 
 * {
@@ -28,29 +54,45 @@ html, body, #root {
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--color-bg-deep);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* Scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-primary);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-secondary);
+  background: rgba(255, 255, 255, 0.14);
 }
 
+/* Monospace font */
 .font-mono {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Geist Mono', 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+/* Focus ring utility */
+.focus-ring:focus-visible {
+  outline: 1px solid var(--color-accent-cyan);
+  outline-offset: -1px;
+}
+
+/* Selection */
+::selection {
+  background: rgba(0, 229, 255, 0.25);
+  color: #fff;
 }

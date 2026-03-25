@@ -70,7 +70,7 @@ def build():
     for imp in HIDDEN_IMPORTS:
         hidden += ["--hidden-import", imp]
 
-    entry = BACKEND_DIR / "app" / "main.py"
+    entry = BACKEND_DIR / "run.py"
 
     cmd = [
         sys.executable,
@@ -80,6 +80,7 @@ def build():
         "--distpath", str(BINARIES_DIR),
         "--workpath", str(BACKEND_DIR / "build"),
         "--specpath", str(BACKEND_DIR / "build"),
+        "--collect-all", "litellm",
         *hidden,
         str(entry),
     ]

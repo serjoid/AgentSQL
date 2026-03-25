@@ -1,3 +1,4 @@
+#[cfg(debug_assertions)]
 use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
 
