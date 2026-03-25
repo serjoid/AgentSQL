@@ -1,72 +1,100 @@
-# AgentSQL - AI-Powered Database Management System
+# AgentSQL — AI-Powered Database Management System
 
-Desktop database manager with a native AI Agent. Use your own API key (Gemini, OpenAI, etc.) to generate optimized SQL. Features a modern UI and a Human-in-the-loop security lock to prevent accidental destructive queries.
+Gerenciador de banco de dados desktop com agente AI nativo. Use sua própria chave de API (Gemini, OpenAI, etc.) para gerar SQL otimizado. Interface moderna com trava de segurança Human-in-the-Loop para prevenir queries destrutivas acidentais.
 
 ## Features
 
-- **Multi-Database Support**: PostgreSQL, SQLite (extensible)
-- **AI Assistant**: Integrated chat with LLMs (OpenAI, Gemini, DeepSeek, Nvidia, Anthropic)
-- **Human-in-the-Loop**: Confirmation modal for destructive queries
-- **Schema Explorer**: Tree-view navigation for databases, tables, columns
-- **SQL Editor**: Syntax-highlighted query editor
-- **Dark Mode**: Native dark theme support
+- **Multi-Database**: PostgreSQL, SQLite (extensível)
+- **AI Assistant**: Chat com LLMs via LiteLLM (OpenAI, Gemini, DeepSeek, Nvidia, Anthropic)
+- **HITL Security**: Modal de confirmação obrigatório para UPDATE / DELETE / DROP / ALTER / TRUNCATE / INSERT
+- **Schema Explorer**: Navegação em árvore — databases, tabelas, colunas
+- **SQL Editor**: Monaco Editor com syntax highlighting e execução real
+- **Context Route**: `POST /api/context/schema/{conn_id}` — push do DDL para o LLM antes de cada chat
+- **Dark Mode**: Tema escuro nativo
 
-## Architecture
+## Arquitetura
 
 ```
 ┌─────────────────────────────────────────────┐
-│           Tauri Desktop App                 │
-│  ┌─────────┐ ┌─────────┐ ┌───────────────┐ │
-│  │  React  │ │   SQL   │ │   AI Agent    │ │
-│  │   UI    │ │  Editor │ │   Chat Panel  │ │
-│  └────┬────┘ └────┬────┘ └───────┬───────┘ │
-│       └───────────┴──────────────┘         │
-│                   │                        │
-└───────────────────┼────────────────────────┘
-                    │ HTTP (localhost:8000)
+│           Tauri Desktop App (v2)            │
+│  ┌─────────┐ ┌─────────────┐ ┌───────────┐ │
+│  │  React  │ │ Monaco SQL  │ │  AI Chat  │ │
+│  │ Zustand │ │   Editor    │ │   Panel   │ │
+│  └────┬────┘ └──────┬──────┘ └─────┬─────┘ │
+│       └─────────────┴───────────────┘        │
+│               HTTP localhost:8000            │
+└───────────────────┬──────────────────────────┘
                     ▼
 ┌───────────────────────────────────────────────┐
 │           Python Backend (FastAPI)            │
-│  ┌─────────┐ ┌─────────┐ ┌───────────────┐   │
-│  │ SQLAlchemy│  Query  │ │    LiteLLM    │   │
-│  │   ORM    │  Filter │ │    Router     │   │
-│  └─────────┘ └─────────┘ └───────────────┘   │
+│  ┌──────────┐ ┌────────────┐ ┌─────────────┐ │
+│  │SQLAlchemy│ │QueryFilter │ │   LiteLLM   │ │
+│  │ + Schema │ │ (HITL gate)│ │   Router    │ │
+│  │Extractor │ └────────────┘ └─────────────┘ │
+│  └──────────┘                                 │
 └───────────────────────────────────────────────┘
 ```
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Desktop | Tauri v2 (Rust) |
-| Frontend | React 18 + TypeScript |
-| Styling | TailwindCSS v4 |
-| Backend | Python 3.11+ / FastAPI |
-| ORM | SQLAlchemy 2.0 |
-| AI Router | LiteLLM |
+| Layer     | Tecnologia               |
+|-----------|--------------------------|
+| Desktop   | Tauri v2 (Rust)          |
+| Frontend  | React 18 + TypeScript    |
+| Estilo    | TailwindCSS v4           |
+| Editor    | Monaco Editor            |
+| State     | Zustand v5               |
+| Backend   | Python 3.11+ / FastAPI   |
+| ORM       | SQLAlchemy 2.0 async     |
+| AI Router | LiteLLM                  |
 
-## Project Structure
+## Estrutura do Projeto
 
 ```
-sgbd/
-├── frontend/           # Tauri + React application
+AgentSQL/
+├── frontend/
 │   ├── src/
-│   │   ├── components/
-│   │   ├── hooks/
-│   │   ├── stores/
-│   │   └── services/
-│   └── src-tauri/      # Rust backend
+│   │   ├── components/     # Layout, Sidebar, Editor, AIPanel,
+│   │   │                   # SQLEditor, ConfirmationModal, ConnectionModal
+│   │   ├── stores/         # useConnectionStore, useQueryStore,
+│   │   │                   # useAIStore, useModalStore (Zustand)
+│   │   ├── services/api.ts # Cliente REST tipado
+│   │   └── types/
+│   └── src-tauri/
+│       ├── src/lib.rs      # spawn sidecar (release) + DevTools (debug)
+│       ├── tauri.conf.json # janela 1400×900
+│       ├── capabilities/   # permissões Tauri v2
+│       └── icons/          # 32x32, 128x128, 128x128@2x, icon.ico
 │
-├── backend/            # Python FastAPI
+├── backend/
 │   ├── app/
-│   │   ├── api/routes/
+│   │   ├── main.py                    # FastAPI app + CORS + routers
+│   │   ├── api/
+│   │   │   ├── dependencies.py        # Depends: connection / engine
+│   │   │   └── routes/
+│   │   │       ├── connection.py      # /api/connection/*
+│   │   │       ├── query.py           # /api/query/* (execução real)
+│   │   │       ├── ai.py              # /api/ai/*
+│   │   │       └── context.py         # /api/context/*
 │   │   ├── core/
+│   │   │   ├── config.py              # Pydantic Settings
+│   │   │   ├── security.py            # Fernet + InMemoryKeyStore
+│   │   │   └── query_filter.py        # HITL — QueryFilter
 │   │   ├── db/
-│   │   ├── llm/
-│   │   └── models/
+│   │   │   ├── connections.py         # ConnectionManager lifecycle
+│   │   │   └── metadata.py            # SchemaExtractor (DDL inspection)
+│   │   └── llm/
+│   │       ├── router.py              # LiteLLM wrapper
+│   │       └── context.py             # ContextManager (schema + history)
+│   ├── tests/
+│   │   ├── test_query_filter.py       # 11 testes HITL
+│   │   ├── test_connections.py        # 8 testes SQLite in-memory
+│   │   └── test_routes.py             # 10 testes de rota
+│   ├── scripts/build_sidecar.py       # PyInstaller → sidecar Tauri
 │   └── requirements.txt
 │
-└── system_context.md   # AI Agent knowledge base
+├── system_context.md
+└── README.md
 ```
 
 ## Quick Start
@@ -76,74 +104,101 @@ sgbd/
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # Linux/macOS
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-API Documentation: http://localhost:8000/docs
+Docs interativas: http://localhost:8000/docs
 
-### Frontend
+### Frontend (Web)
 
 ```bash
 cd frontend
 npm install
-npm run tauri dev
+npm run dev     # http://localhost:3000
+```
+
+### Desktop (requer Rust)
+
+```bash
+# Instalar Rust: https://rustup.rs
+cd frontend
+npm run tauri:dev
+```
+
+### Testes
+
+```bash
+cd backend
+pytest tests/ -v   # 29 testes esperados
 ```
 
 ## API Endpoints
 
-### Connection Management
+### Connection — `/api/connection`
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/connection/connect` | Create DB connection |
-| GET | `/api/connection/list` | List active connections |
-| DELETE | `/api/connection/{id}` | Remove connection |
-| GET | `/api/connection/{id}/schema` | Get schema metadata |
+| Method | Endpoint                      | Descrição |
+|--------|-------------------------------|-----------|
+| POST   | `/connect`                    | Criar conexão (PostgreSQL/SQLite) |
+| GET    | `/list`                       | Listar conexões ativas |
+| DELETE | `/{id}`                       | Remover conexão |
+| GET    | `/{id}/schema`                | Schema DDL da conexão |
 
-### Query Operations
+### Query — `/api/query`
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/query/validate` | Check if query is destructive |
-| POST | `/api/query/execute` | Execute SQL query |
-| POST | `/api/query/preview` | Preview with LIMIT |
+| Method | Endpoint    | Descrição |
+|--------|-------------|-----------|
+| POST   | `/validate` | Analisa query (HITL check) |
+| POST   | `/execute`  | Executa — `HTTP 403` se destrutiva sem confirmação |
+| POST   | `/preview`  | Executa com `LIMIT 100` automático |
+| GET    | `/is-safe`  | `?query=...` verificação rápida |
 
-### AI Integration
+### AI — `/api/ai`
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/ai/providers` | List available LLM providers |
-| POST | `/api/ai/config` | Configure API key for provider |
-| POST | `/api/ai/chat` | Chat with AI assistant |
-| POST | `/api/ai/suggest` | Get query suggestions |
-| POST | `/api/ai/analyze` | Analyze query for risks |
+| Method | Endpoint         | Descrição |
+|--------|------------------|-----------|
+| GET    | `/providers`     | Lista providers e modelos |
+| POST   | `/config`        | Configura chave API do provider |
+| POST   | `/chat`          | Chat com AI (schema no contexto) |
+| POST   | `/suggest`       | Sugestão de query SQL |
+| POST   | `/analyze`       | Análise de risco da query |
 
-## Security
+### Context — `/api/context`
 
-- **Human-in-the-Loop**: All destructive queries require explicit confirmation
-- **Destructive Operations**: UPDATE, DELETE, DROP, ALTER, TRUNCATE, INSERT
-- **API Keys**: Stored in-memory only, cleared on restart
-- **Encryption**: AES-256-GCM for connection strings
+| Method | Endpoint                 | Descrição |
+|--------|--------------------------|-----------|
+| POST   | `/schema/{conn_id}`      | Extrai schema e carrega no LLM context |
+| GET    | `/schema/{conn_id}`      | Lê o contexto de schema atual |
+| DELETE | `/schema`                | Limpa contexto de schema |
+| DELETE | `/history`               | Limpa histórico de chat |
 
-## Supported LLM Providers
+## Segurança
 
-| Provider | Models |
-|----------|--------|
-| OpenAI | gpt-5, gpt-5-mini, o1-preview |
-| Gemini | gemini-3-pro, gemini-3-flash |
-| DeepSeek | deepseek-v3, deepseek-r1 |
-| Nvidia | GLM 5, Minimax 2.5, Qwen 3.5 |
-| Anthropic | claude-4.6-sonnet, claude-4.6-opus |
+- **HITL**: UPDATE, DELETE, DROP, ALTER, TRUNCATE, INSERT sempre requerem confirmação
+- **Chaves de API**: memória apenas — nunca persistidas, limpas ao reiniciar
+- **Strings de conexão**: criptografia AES-256 (Fernet/PBKDF2)
+- **Queries**: sempre via `text()` SQLAlchemy — sem concatenação
 
-## Development Phases
+## LLM Providers
 
-- [x] **Phase 1**: Backend Foundation (API, Query Filter, LiteLLM)
-- [ ] **Phase 2**: Database Layer (Connection Management, Schema Explorer)
-- [ ] **Phase 3**: Query Engine (SQL Editor, Execution, Results Grid)
-- [ ] **Phase 4**: AI Integration (Chat Panel, Context Assembly)
-- [ ] **Phase 5**: Polish & Security (Testing, Documentation)
+| Provider  | Modelos                                   |
+|-----------|-------------------------------------------|
+| OpenAI    | gpt-5, gpt-5-mini, o1-preview             |
+| Gemini    | gemini-3-pro, gemini-3-flash              |
+| DeepSeek  | deepseek-v3, deepseek-r1                  |
+| Nvidia    | GLM 5, Minimax 2.5, Qwen 3.5             |
+| Anthropic | claude-4.6-sonnet, claude-4.6-opus        |
+
+## Fases de Desenvolvimento
+
+- [x] **Fase 1**: Backend Foundation (FastAPI, HITL filter, LiteLLM)
+- [x] **Fase 2**: Database Layer (ConnectionManager, SchemaExtractor)
+- [x] **Fase 3**: Query Engine (execução real, HITL gate, preview)
+- [x] **Fase 4**: AI Integration (chat, suggest, analyze, context route)
+- [x] **Fase 4.5**: Tauri Desktop (sidecar, IPC, ícones, build pipeline)
+- [ ] **Fase 5**: Polish & Security (CI/CD, testes E2E, docs finais)
 
 ## License
 

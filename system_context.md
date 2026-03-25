@@ -1,543 +1,389 @@
-# SGBD - AI-Powered Database Management System
-
-## Overview
-
-Desktop application for database management with native AI Agent integration. Users can connect to multiple database engines and use their own API keys to interact with LLMs for query assistance, schema exploration, and data analysis.
-
-## Architecture
-
-### High-Level Flow
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           TAURI DESKTOP APP                                  │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────────────────┐  │
-│  │   React     │    │    SQL      │    │          AI Agent               │  │
-│  │  Frontend   │◄──►│   Editor    │◄──►│        Chat Panel               │  │
-│  │    (UI)     │    │   + Grid    │    │        (Right Panel)            │  │
-│  └──────┬──────┘    └──────┬──────┘    └──────────────┬──────────────────┘  │
-│         │                  │                          │                      │
-│         └──────────────────┴──────────────────────────┘                      │
-│                               │                                              │
-│                      Tauri IPC Bridge                                        │
-│                               │                                              │
-└───────────────────────────────┼──────────────────────────────────────────────┘
-                                │
-                                ▼
-┌───────────────────────────────────────────────────────────────────────────────┐
-│                        PYTHON BACKEND (FastAPI)                               │
-│                         localhost:8000                                        │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────────────────┐   │
-│  │ SQLAlchemy  │    │   Query     │    │           LiteLLM               │   │
-│  │   DB Layer  │◄──►│  Executor   │◄──►│           Router                │   │
-│  └──────┬──────┘    └──────┬──────┘    └──────────────┬──────────────────┘   │
-│         │                  │                          │                      │
-│         └──────────────────┴──────────────────────────┘                      │
-│                               │                                              │
-└───────────────────────────────┼──────────────────────────────────────────────┘
-                                │
-                ┌───────────────┴───────────────┐
-                │                               │
-                ▼                               ▼
-        ┌───────────────┐               ┌───────────────┐
-        │   Database    │               │    LLM APIs   │
-        │   Engines     │               │ (OpenAI,      │
-        │(PostgreSQL,   │               │  Gemini,      │
-        │   SQLite)     │               │  DeepSeek,    │
-        └───────────────┘               │  Nvidia)      │
-                                        └───────────────┘
-```
-
-## Tech Stack
-
-| Layer              | Technology          | Purpose                              |
-|--------------------|---------------------|--------------------------------------|
-| Desktop Framework  | Tauri v2            | Native desktop wrapper (Rust)        |
-| Frontend           | React 18 + TypeScript | UI components                      |
-| Styling            | TailwindCSS v4      | Utility-first CSS                    |
-| Backend            | Python 3.11+        | Core logic and data processing       |
-| API Framework      | FastAPI             | Async REST API                       |
-| ORM                | SQLAlchemy 2.0      | Database abstraction                 |
-| AI Router          | LiteLLM             | Unified LLM API interface            |
-
-## Business Rules
-
-### Security Rules (CRITICAL)
-
-1. **Human-in-the-Loop (HITL)**: All state-altering queries MUST be intercepted and require explicit user confirmation before execution.
-
-2. **Blocked operations**:
-   - UPDATE
-   - DELETE
-   - DROP
-   - ALTER
-   - TRUNCATE
-   - INSERT
-
-3. **AI restrictions**:
-   - AI can ONLY generate/modify queries, NEVER execute them directly
-   - AI suggestions pass through same HITL filter
-   - User API keys stored in-memory only (never persisted, cleared on restart)
-
-### Connection Management
-
-- Users can save multiple database connections
-- Connection credentials encrypted at rest
-- Supported databases: PostgreSQL, SQLite
-
-### AI Integration
-
-- User provides their own API key per provider
-- Supported providers: OpenAI, Gemini, DeepSeek, Nvidia NIM, Anthropic
-- LiteLLM normalizes all calls to unified format
-- Context window includes:
-  - Current schema metadata
-  - Recent queries (last N)
-  - Chat history
-
-## Data Flow
-
-### Query Execution Flow
-
-```
-User Input
-    │
-    ▼
-Syntax Validation
-    │
-    ▼
-┌──────────────────┐
-│   HITL Check     │
-│ Query Filter     │
-└────────┬─────────┘
-         │
-    ┌────┴────┐
-    │         │
-    ▼         ▼
- Destructive?  Safe
-    │           │
-    ▼           ▼
-┌────────┐   Execute
-│ Modal  │   Directly
-│Confirm?│
-└────┬───┘
-     │
-  ┌──┴──┐
-  │     │
- Yes    No
-  │     │
-  ▼     ▼
-Execute Cancel
-```
-
-### AI Chat Flow
-
-```
-User Message
-    │
-    ▼
-Context Assembly
-    ├─ Current Schema
-    ├─ Last N Queries
-    └─ Chat History
-    │
-    ▼
-LiteLLM Router
-    │
-    ▼
-Provider API
-    │
-    ▼
-Response
-```
-
-## Directory Structure
-
-```
-sgbd/
-├── frontend/                    # Tauri + React (Phase 2)
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── layout/
-│   │   │   ├── editor/
-│   │   │   ├── sidebar/
-│   │   │   ├── ai-panel/
-│   │   │   └── modals/
-│   │   ├── hooks/
-│   │   ├── stores/
-│   │   ├── services/
-│   │   └── types/
-│   ├── package.json
-│   └── tauri.conf.json
-│
-├── backend/                     # Python FastAPI (Phase 1)
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py              # FastAPI app entry
-│   │   ├── api/
-│   │   │   ├── __init__.py
-│   │   │   ├── routes/
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── connection.py
-│   │   │   │   ├── query.py
-│   │   │   │   └── ai.py
-│   │   │   └── dependencies.py
-│   │   ├── core/
-│   │   │   ├── __init__.py
-│   │   │   ├── config.py
-│   │   │   ├── security.py
-│   │   │   └── query_filter.py  # HITL logic
-│   │   ├── db/
-│   │   │   ├── __init__.py
-│   │   │   ├── connections.py
-│   │   │   └── metadata.py
-│   │   ├── llm/
-│   │   │   ├── __init__.py
-│   │   │   ├── router.py        # LiteLLM wrapper
-│   │   │   └── context.py
-│   │   └── models/
-│   │       ├── __init__.py
-│   │       ├── requests.py
-│   │       └── responses.py
-│   ├── requirements.txt
-│   └── pyproject.toml
-│
-├── docs/
-│   └── system_context.md
-│
-└── README.md
-```
-
-## API Endpoints
-
-### Connection Management
-
-| Method | Endpoint          | Purpose                    |
-|--------|-------------------|----------------------------|
-| POST   | /api/connect      | Establish DB connection    |
-| DELETE | /api/disconnect   | Close DB connection        |
-| GET    | /api/connections  | List active connections    |
-
-### Schema & Query
-
-| Method | Endpoint              | Purpose                          |
-|--------|-----------------------|----------------------------------|
-| GET    | /api/schema/{conn_id} | Fetch schema metadata            |
-| POST   | /api/query/validate   | Check if query is destructive    |
-| POST   | /api/query/execute    | Execute query (with HITL bypass) |
-| POST   | /api/query/preview    | Preview with LIMIT wrapper       |
-
-### AI Agent
-
-| Method | Endpoint            | Purpose                        |
-|--------|---------------------|--------------------------------|
-| POST   | /api/ai/chat        | Send message to AI agent       |
-| POST   | /api/ai/config      | Set LLM provider + API key     |
-| GET    | /api/ai/providers   | List available providers       |
-| GET    | /api/ai/models      | List models for provider       |
-
-## Configuration
-
-### Environment Variables
-
-```env
-# Backend
-BACKEND_PORT=8000
-BACKEND_HOST=localhost
-DEBUG=false
-
-# Security (generated on first run)
-ENCRYPTION_KEY=<auto-generated>
-SESSION_SECRET=<auto-generated>
-```
-
-### In-Memory Storage
-
-API keys are stored in memory during session:
-
-```python
-# Structure
-api_keys: dict[str, str] = {
-    "openai": "sk-...",
-    "gemini": "AIza...",
-    "deepseek": "sk-...",
-    "nvidia": "nvapi-...",
-    "anthropic": "sk-ant-..."
-}
-```
-
-**Note**: Keys are cleared on backend restart. User must reconfigure.
-
-## Supported LLM Providers
-
-| Provider  | Model Format                        | Example Models                    |
-|-----------|-------------------------------------|-----------------------------------|
-| OpenAI    | `openai/{model}`                    | gpt-4o, gpt-4o-mini, gpt-4-turbo |
-| Gemini    | `gemini/{model}`                    | gemini-1.5-pro, gemini-1.5-flash |
-| DeepSeek  | `deepseek/{model}`                  | deepseek-chat, deepseek-coder    |
-| Nvidia    | `nvidia/{model}`                    | nvidia/llama-3.1-nemotron-70b    |
-| Anthropic | `anthropic/{model}`                 | claude-3-5-sonnet, claude-3-haiku|
-
-## Security Considerations
-
-1. **API Key Storage**: In-memory only, never persisted, cleared on restart
-2. **SQL Injection**: Parameterized queries only (SQLAlchemy)
-3. **Query Validation**: Regex + keyword extraction (no execution-based detection)
-4. **Error Handling**: Sanitized messages, no internal paths exposed
-5. **Encryption**: AES-256-GCM for future persistent storage
-
-## HITL (Human-in-the-Loop) Implementation
-
-### Query Filter Logic
-
-```python
-class QueryFilter:
-    DESTRUCTIVE_KEYWORDS = [
-        'UPDATE',
-        'DELETE',
-        'DROP',
-        'ALTER',
-        'TRUNCATE',
-        'INSERT'
-    ]
-
-    def analyze(query: str) -> QueryAnalysis:
-        # 1. Strip SQL comments
-        # 2. Normalize whitespace
-        # 3. Extract first SQL keyword
-        # 4. Check against destructive list
-        # 5. Extract affected tables via regex
-        # 6. Return structured analysis
-```
-
-### QueryAnalysis Response
-
-```python
-@dataclass
-class QueryAnalysis:
-    is_destructive: bool
-    operation_type: str | None      # e.g., "UPDATE", "DELETE"
-    tables_affected: list[str]      # Extracted table names
-    requires_confirmation: bool     # Always True if destructive
-    raw_query: str
-    normalized_query: str
-```
-
-## Development Phases
-
-### Phase 1: Backend Foundation ✅
-- Week 1-2: Project scaffolding, FastAPI setup, query filter, LiteLLM router
-
-### Phase 2: Database Layer ✅
-- Week 3-4: Connection management, SQLAlchemy, schema explorer
-
-### Phase 3: Query Engine ✅
-- Week 5-6: SQL Editor, execution, HITL modal, result grid
-
-### Phase 4: AI Integration ✅
-- Week 7-8: LiteLLM integration, chat panel, context assembly
-
-### Phase 4.5: Tauri Desktop Integration ✅
-- Tauri v2 scaffolding, sidecar wiring, build pipeline
-
-### Phase 5: Polish & Security
-- Week 9-10: Testing, error handling, documentation
-
-## Version History
-
-| Version | Date | Changes |
-|---------|------------|------------------------------------------------------|
-| 0.1.0 | 2025-03-25 | Initial backend scaffolding |
-| 0.2.0 | 2025-03-25 | Frontend setup, base components, API client |
-| 0.3.0 | 2025-03-25 | Zustand state, HITL modal, connection modal, SQL highlighting |
-| 0.4.0 | 2026-03-25 | Tauri v2 integration — desktop shell, sidecar pipeline |
-
-## Changelog
-
-### v0.4.0 - Tauri Desktop Integration (2026-03-25)
-
-#### New Files
-| File | Purpose |
-|------|---------|
-| `frontend/src-tauri/Cargo.toml` | Rust crate definition — declares Tauri v2 + plugin deps |
-| `frontend/src-tauri/build.rs` | Tauri build script (required by tauri-build) |
-| `frontend/src-tauri/src/main.rs` | Binary entry point — calls `sgbd_lib::run()` |
-| `frontend/src-tauri/src/lib.rs` | App setup: sidecar spawn (release only), DevTools (debug only) |
-| `frontend/src-tauri/tauri.conf.json` | Window config, build commands, bundle settings |
-| `frontend/src-tauri/capabilities/default.json` | Tauri v2 permission grants (window, shell, dialog) |
-| `backend/pyproject.toml` | Package metadata + PyInstaller hidden-imports config |
-| `backend/scripts/build_sidecar.py` | Builds the Python backend as a platform-specific sidecar binary |
-
-#### Modified Files
-| File | Change |
-|------|--------|
-| `frontend/vite.config.ts` | Added `TAURI_DEV_HOST` support, env prefix, per-platform build targets |
-| `frontend/package.json` | Bumped to v0.4.0; added `@tauri-apps/api ^2`, `@tauri-apps/cli ^2`; added `tauri`, `tauri:dev`, `tauri:build` scripts |
-| `.gitignore` | Added rules for `src-tauri/target/`, `src-tauri/gen/`, `src-tauri/binaries/`, PyInstaller artifacts |
-
-#### Architecture: Sidecar Pattern
-In **development**, the Python backend runs separately:
-```
-Terminal 1: cd backend && uvicorn app.main:app --reload
-Terminal 2: cd frontend && npm run tauri:dev
-```
-
-In **production**, PyInstaller bundles the backend as a platform-specific binary that Tauri spawns on startup:
-```
-backend/scripts/build_sidecar.py
-  → frontend/src-tauri/binaries/backend-{triple}.exe  (Windows)
-  → frontend/src-tauri/binaries/backend-{triple}      (Linux/macOS)
-
-npm run tauri:build
-  → Bundles frontend + Rust shell + sidecar into a single installer
-```
-
-#### Tauri Commands (IPC)
-| Command | Returns | Purpose |
-|---------|---------|---------|
-| `get_backend_url` | `"http://localhost:8000"` | Frontend can query the backend URL at runtime |
-
-#### Prerequisites to run
-- **Rust** toolchain: `rustup` + `cargo`
-- **Node.js** ≥ 18 + `npm install` inside `frontend/`
-- **Python** 3.11+ with `pip install -r backend/requirements.txt`
-- **OS deps** (Linux only): `libwebkit2gtk-4.1-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`
+# AgentSQL — AI-Powered Database Management System
+## system_context.md — Referência Técnica Completa
 
 ---
 
-### v0.3.0 - State Management & UI Components (2025-03-25)
+## Visão Geral
 
-#### New Features
-- **Zustand State Management**: Centralized stores for:
-  - `useConnectionStore`: Database connections and schema
-  - `useQueryStore`: Current query, history, results
-  - `useAIStore`: AI messages, provider, model selection
-  - `useModalStore`: Modal visibility states
+Desktop app para gerenciamento de bancos de dados com agente AI nativo. O usuário conecta bancos de dados locais ou remotos, executa SQL com segurança HITL e usa sua própria chave de API (OpenAI, Gemini, DeepSeek, etc.) para geração e análise de queries.
 
-#### New Components
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| `ConfirmationModal` | `src/components/modals/ConfirmationModal.tsx` | HITL confirmation for destructive queries |
-| `ConnectionModal` | `src/components/modals/ConnectionModal.tsx` | Database connection dialog |
-| `SQLEditor` | `src/components/SQLEditor.tsx` | Custom SQL editor with syntax highlighting |
+---
 
-#### SQLEditor Features
-- Line numbers
-- Syntax highlighting for SQL keywords, strings, numbers, comments
-- Tab key support (2 spaces)
-- Ctrl+Enter to execute
-- Custom dark theme colors
+## Arquitetura
 
-#### ConfirmationModal Features
-- Operation type badge with color coding
-- Affected tables display
-- Full query preview
-- Execute/Cancel buttons
-- Escape key to close
+### Fluxo de Alto Nível
 
-#### ConnectionModal Features
-- PostgreSQL and SQLite support
-- Test connection button
-- Form validation
-- Connection status feedback
-
-#### API Integration
-- All components now use real backend API
-- Query execution flow:
-  1. Validate query via `/api/query/validate`
-  2. If destructive → show ConfirmationModal
-  3. If safe → execute directly
-- Schema fetching on connection select
-- AI provider configuration in panel
-
-### v0.2.0 - Frontend Foundation (2025-03-25)
-
-#### Backend Improvements
-- Fixed import order in `ai.py` route (datetime import moved to top)
-- Fixed import path in `connection.py` route (`..db.connections`)
-- Fixed `add_chat_message` in `context.py` to accept dict and create ChatMessage
-
-#### Frontend Implementation
-- **Project Setup**: Vite + React 18 + TypeScript
-- **Styling**: TailwindCSS v4 with custom CSS variables for theming
-- **Font**: Inter (UI) + JetBrains Mono (code)
-
-#### Components Created
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| `Layout` | `src/components/Layout.tsx` | Main 3-panel layout with resizable sidebars |
-| `Sidebar` | `src/components/Sidebar.tsx` | Schema tree navigation with expandable tables |
-| `Editor` | `src/components/Editor.tsx` | SQL editor + results grid |
-| `AIPanel` | `src/components/AIPanel.tsx` | Chat interface with LLM provider selection |
-
-#### Services
-- `api.ts`: Backend API client with typed endpoints
-  - Connection management (connect, disconnect, schema)
-  - Query operations (validate, execute)
-  - AI endpoints (providers, configure, chat, suggest)
-
-#### Configuration Files
-- `vite.config.ts`: Vite configuration with React plugin
-- `tsconfig.json`: TypeScript configuration with path aliases
-- `tailwind.config.js`: TailwindCSS with custom theme colors
-- `postcss.config.js`: PostCSS configuration
-
-#### Current Directory Structure
 ```
-sgbd/
-├── backend/
-│   ├── app/
-│   │   ├── api/routes/
-│   │   │   ├── ai.py          ✅ Fixed imports
-│   │   │   ├── connection.py  ✅ Fixed imports
-│   │   │   └── query.py
-│   │   ├── core/
-│   │   │   ├── config.py
-│   │   │   ├── security.py
-│   │   │   └── query_filter.py
-│   │   ├── db/
-│   │   │   └── connections.py
-│   │   ├── llm/
-│   │   │   ├── router.py
-│   │   │   └── context.py    ✅ Fixed add_chat_message
-│   │   ├── models/
-│   │   ├── main.py
-│   │   └── __init__.py
-│   ├── requirements.txt
-│   └── .env.example
-│
+┌─────────────────────────────────────────────────────────────────────┐
+│                        TAURI DESKTOP APP                             │
+│  ┌────────────┐   ┌─────────────┐   ┌──────────────────────────┐   │
+│  │   React    │   │  SQL Editor │   │       AI Agent           │   │
+│  │  Frontend  │◄─►│  + Results  │◄─►│      Chat Panel          │   │
+│  └─────┬──────┘   └──────┬──────┘   └─────────────┬────────────┘   │
+│        └─────────────────┴──────────────────────────┘               │
+│                           │  HTTP (localhost:8000)                   │
+└───────────────────────────┼─────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    PYTHON BACKEND (FastAPI)                           │
+│  ┌────────────┐   ┌─────────────┐   ┌──────────────────────────┐   │
+│  │ SQLAlchemy │   │ QueryFilter │   │        LiteLLM           │   │
+│  │  + Schema  │◄─►│ (HITL gate) │◄─►│        Router            │   │
+│  └────────────┘   └─────────────┘   └──────────────────────────┘   │
+└───────────────────┬─────────────────────────────────────────────────┘
+                    │
+          ┌─────────┴─────────┐
+          ▼                   ▼
+  ┌───────────────┐   ┌───────────────┐
+  │  PostgreSQL   │   │   LLM APIs    │
+  │  SQLite       │   │  OpenAI       │
+  └───────────────┘   │  Gemini       │
+                      │  DeepSeek     │
+                      │  Nvidia NIM   │
+                      │  Anthropic    │
+                      └───────────────┘
+```
+
+### Padrão Sidecar (Produção)
+
+Em **desenvolvimento**: backend e frontend correm em terminais separados.
+Em **produção**: PyInstaller empacota o backend em binário que o Tauri inicia automaticamente.
+
+```
+backend/scripts/build_sidecar.py
+  → frontend/src-tauri/binaries/backend-{triple}.exe   (Windows)
+  → frontend/src-tauri/binaries/backend-{triple}       (Linux/macOS)
+
+npm run tauri:build
+  → installer único com frontend + shell Rust + sidecar
+```
+
+---
+
+## Tech Stack
+
+| Layer             | Tecnologia              | Versão     |
+|-------------------|-------------------------|------------|
+| Desktop           | Tauri                   | v2         |
+| Frontend          | React + TypeScript       | 18 / 5     |
+| Estilo            | TailwindCSS             | v4         |
+| Backend           | Python + FastAPI        | 3.11+ / 0.109+ |
+| ORM               | SQLAlchemy (async)      | 2.0        |
+| AI Router         | LiteLLM                 | ≥1.20      |
+| SQL Editor        | Monaco Editor           | @4.7       |
+| State             | Zustand                 | v5         |
+| Desktop Shell     | Rust (tauri-plugin-shell, -dialog) | — |
+
+---
+
+## Regras de Negócio
+
+### HITL (Human-in-the-Loop) — CRÍTICO
+
+Toda query que altera estado **DEVE** passar pelo `QueryFilter` antes de chegar ao banco.
+Operações bloqueadas por padrão (requerem confirmação explícita):
+
+- `UPDATE` / `DELETE` / `DROP` / `ALTER` / `TRUNCATE` / `INSERT`
+
+Fluxo:
+
+```
+Query do usuário
+      │
+      ▼
+ QueryFilter.analyze()
+      │
+  ┌───┴───┐
+  │       │
+  ▼       ▼
+Destrutiva?  Segura
+  │            │
+  ▼            ▼
+ConfirmationModal  Execute direto
+  │
+  ├─ Confirmado → Execute
+  └─ Cancelado  → Abort
+```
+
+O endpoint `POST /api/query/execute` retorna **HTTP 403** se a query for destrutiva e `skip_confirmation=false`.
+
+### Segurança
+
+- Chaves de API em **memória apenas** — nunca persistidas, limpas ao reiniciar
+- Strings de conexão criptografadas com AES-256 (Fernet/PBKDF2)
+- Queries executadas via `text()` do SQLAlchemy (nunca concatenação)
+- Mensagens de erro sanitizadas em produção
+
+---
+
+## Estrutura de Diretórios (v0.4.0)
+
+```
+AgentSQL/
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── Layout.tsx     ✅ 3-panel layout
-│   │   │   ├── Sidebar.tsx    ✅ Schema explorer
-│   │   │   ├── Editor.tsx     ✅ SQL editor + grid
-│   │   │   └── AIPanel.tsx    ✅ AI chat panel
+│   │   │   ├── Layout.tsx          # Layout 3 painéis
+│   │   │   ├── Sidebar.tsx         # Schema explorer
+│   │   │   ├── Editor.tsx          # SQL editor + results grid
+│   │   │   ├── AIPanel.tsx         # Chat AI
+│   │   │   ├── SQLEditor.tsx       # Monaco + syntax highlight
+│   │   │   └── modals/
+│   │   │       ├── ConfirmationModal.tsx   # HITL confirm
+│   │   │       └── ConnectionModal.tsx     # Nova conexão
+│   │   ├── stores/
+│   │   │   └── index.ts            # useConnectionStore, useQueryStore,
+│   │   │                           # useAIStore, useModalStore (Zustand)
 │   │   ├── services/
-│   │   │   └── api.ts         ✅ Backend client
-│   │   ├── types/
-│   │   │   └── index.ts       ✅ TypeScript interfaces
-│   │   ├── App.tsx
-│   │   ├── main.tsx
-│   │   └── index.css
+│   │   │   └── api.ts              # Cliente REST tipado
+│   │   └── types/index.ts
+│   ├── src-tauri/
+│   │   ├── Cargo.toml              # Deps Rust: tauri v2, plugins
+│   │   ├── build.rs
+│   │   ├── tauri.conf.json         # Janela 1400×900, sidecar backend
+│   │   ├── capabilities/default.json   # Permissões Tauri v2
+│   │   ├── icons/                  # 32x32, 128x128, 128x128@2x, icon.ico
+│   │   └── src/
+│   │       ├── main.rs             # Entry point Rust
+│   │       └── lib.rs              # setup(), spawn sidecar, DevTools
 │   ├── package.json
-│   ├── tsconfig.json
-│   ├── vite.config.ts
-│   ├── tailwind.config.js
-│   └── postcss.config.js
+│   └── vite.config.ts
+│
+├── backend/
+│   ├── app/
+│   │   ├── main.py                 # FastAPI app, CORS, routers
+│   │   ├── api/
+│   │   │   ├── dependencies.py     # Depends: get_connection, get_engine
+│   │   │   └── routes/
+│   │   │       ├── connection.py   # /api/connection/*
+│   │   │       ├── query.py        # /api/query/* (execução real)
+│   │   │       ├── ai.py           # /api/ai/*
+│   │   │       └── context.py      # /api/context/* (schema → LLM)
+│   │   ├── core/
+│   │   │   ├── config.py           # Pydantic Settings
+│   │   │   ├── security.py         # Fernet encrypt, InMemoryKeyStore
+│   │   │   └── query_filter.py     # HITL — regex + keyword extraction
+│   │   ├── db/
+│   │   │   ├── connections.py      # ConnectionManager lifecycle
+│   │   │   └── metadata.py         # SchemaExtractor — inspeciona DDL
+│   │   ├── llm/
+│   │   │   ├── router.py           # LiteLLM wrapper
+│   │   │   └── context.py          # ContextManager (schema + chat history)
+│   │   └── models/
+│   │       ├── requests.py
+│   │       └── responses.py
+│   ├── tests/
+│   │   ├── test_query_filter.py    # 11 testes HITL
+│   │   ├── test_connections.py     # 8 testes SQLite in-memory
+│   │   └── test_routes.py          # 10 testes de rota (FastAPI)
+│   ├── scripts/
+│   │   └── build_sidecar.py        # PyInstaller → binário Tauri
+│   ├── requirements.txt
+│   └── pyproject.toml              # pytest asyncio_mode=auto
 │
 ├── system_context.md
 └── README.md
 ```
 
-#### Next Steps (Phase 2)
-1. **HITL Modal Component**: Confirmation dialog for destructive queries
-2. **Tauri Integration**: Rust configuration for native desktop
-3. **Real Database Connection**: Test PostgreSQL/SQLite connections
-4. **State Management**: Implement Zustand or similar for app state
-5. **Syntax Highlighting**: Monaco Editor or CodeMirror integration
+---
+
+## API Endpoints
+
+### Connection — `/api/connection`
+
+| Method | Endpoint                      | Descrição                    |
+|--------|-------------------------------|------------------------------|
+| POST   | `/api/connection/connect`     | Cria conexão (PostgreSQL/SQLite) |
+| GET    | `/api/connection/list`        | Lista conexões ativas        |
+| DELETE | `/api/connection/{id}`        | Remove conexão               |
+| GET    | `/api/connection/{id}/schema` | Schema DDL da conexão        |
+
+### Query — `/api/query`
+
+| Method | Endpoint              | Descrição                              |
+|--------|-----------------------|----------------------------------------|
+| POST   | `/api/query/validate` | Analisa a query (HITL check)           |
+| POST   | `/api/query/execute`  | Executa query — retorna `403` se destrutiva sem `skip_confirmation=true` |
+| POST   | `/api/query/preview`  | Executa com `LIMIT 100` automático     |
+| GET    | `/api/query/is-safe`  | `?query=...` — verificação rápida      |
+
+### AI — `/api/ai`
+
+| Method | Endpoint               | Descrição                         |
+|--------|------------------------|-----------------------------------|
+| GET    | `/api/ai/providers`    | Lista providers e modelos         |
+| POST   | `/api/ai/config`       | Configura chave de API do provider|
+| DELETE | `/api/ai/config/{p}`   | Remove chave de API               |
+| POST   | `/api/ai/chat`         | Chat com AI (inclui schema no contexto) |
+| POST   | `/api/ai/suggest`      | Sugestão de query SQL             |
+| POST   | `/api/ai/analyze`      | Análise de risco da query         |
+| DELETE | `/api/ai/history`      | Limpa histórico de chat           |
+
+### Context — `/api/context`
+
+| Method | Endpoint                        | Descrição                            |
+|--------|---------------------------------|--------------------------------------|
+| GET    | `/api/context/schema/{conn_id}` | Retorna schema armazenado no contexto|
+| POST   | `/api/context/schema/{conn_id}` | Extrai schema da conexão ativa → LLM |
+| DELETE | `/api/context/schema`           | Limpa contexto de schema             |
+| DELETE | `/api/context/history`          | Limpa histórico de chat do contexto  |
+
+### Utilitário
+
+| Method | Endpoint   | Descrição          |
+|--------|------------|--------------------|
+| GET    | `/`        | Info da API        |
+| GET    | `/health`  | Status + uptime    |
+| GET    | `/docs`    | Swagger UI         |
 
 ---
 
-**Last Updated**: 2026-03-25
+## LLM Providers Suportados
+
+| Provider  | Modelos                                     |
+|-----------|---------------------------------------------|
+| OpenAI    | gpt-5, gpt-5-mini, o1-preview               |
+| Gemini    | gemini-3-pro, gemini-3-flash                |
+| DeepSeek  | deepseek-v3, deepseek-r1                    |
+| Nvidia    | GLM 5, Minimax 2.5, Qwen 3.5               |
+| Anthropic | claude-4.6-sonnet, claude-4.6-opus          |
+
+---
+
+## Módulos Chave — Detalhes de Implementação
+
+### `core/query_filter.py` — QueryFilter
+
+```python
+# Operações interceptadas
+DESTRUCTIVE_KEYWORDS = ['UPDATE','DELETE','DROP','ALTER','TRUNCATE','INSERT']
+
+def analyze(query: str) -> QueryAnalysis:
+    # 1. strip_comments() — remove --, /* */, #
+    # 2. normalize_query() — colapsa espaços
+    # 3. extract_first_keyword() — regex no início
+    # 4. Se destrutivo → extract_tables() por regex específico por operação
+    # 5. Retorna QueryAnalysis(is_destructive, operation_type, tables_affected, ...)
+```
+
+### `db/metadata.py` — SchemaExtractor
+
+```python
+class SchemaExtractor:
+    async def extract(engine, conn_id) -> SchemaResponse:
+        # run_sync() para usar inspector síncrono dentro de conexão async
+        # Itera schemas → tabelas → colunas (com PK, nullable, tipo)
+        # Busca views e funções (PostgreSQL)
+```
+
+### `api/dependencies.py` — FastAPI Depends
+
+```python
+get_connection_info(connection_id: str) -> ConnectionInfo   # 404 se ausente
+get_active_connection(conn) -> ConnectionInfo               # 503 se inativo
+get_engine(conn) -> AsyncEngine                             # 503 se engine ausente
+```
+
+### `llm/context.py` — ContextManager
+
+Singleton que mantém:
+- `_raw_schema_text` — texto DDL formatado para o LLM
+- `_current_schema` — SchemaInfo estruturado
+- `_query_history` — deque(maxlen=50)
+- `_chat_history` — deque(maxlen=20)
+
+Métodos: `get_schema_context()`, `set_schema_context(text)`, `add_chat_message()`, `get_chat_messages_for_llm()`
+
+---
+
+## Configuração
+
+### Variáveis de Ambiente (`backend/.env`)
+
+```env
+BACKEND_HOST=localhost
+BACKEND_PORT=8000
+DEBUG=false
+ENCRYPTION_KEY=<gerado automaticamente>
+SESSION_SECRET=<gerado automaticamente>
+MAX_QUERY_HISTORY=50
+MAX_CHAT_HISTORY=20
+QUERY_TIMEOUT=30
+```
+
+### Tauri IPC Command
+
+| Comando          | Retorno                  | Uso                                   |
+|------------------|--------------------------|---------------------------------------|
+| `get_backend_url`| `"http://localhost:8000"`| Frontend obtém URL do backend em runtime |
+
+---
+
+## Como Rodar
+
+### Desenvolvimento
+
+```bash
+# Terminal 1 — Backend
+cd backend
+python -m venv venv && venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+
+# Terminal 2 — Frontend (web mode)
+cd frontend
+npm install
+npm run dev
+
+# Terminal 2 — Frontend (Tauri desktop, requer Rust)
+npm run tauri:dev
+```
+
+### Testes
+
+```bash
+cd backend
+pytest tests/ -v
+# Esperado: 29 testes passando
+```
+
+### Build Produção
+
+```bash
+# 1. Empacotar backend como sidecar
+cd backend && python scripts/build_sidecar.py
+
+# 2. Build do app desktop
+cd frontend && npm run tauri:build
+```
+
+---
+
+## Fases de Desenvolvimento
+
+| Fase | Descrição | Status |
+|------|-----------|--------|
+| 1 | Backend Foundation — FastAPI, HITL filter, LiteLLM | ✅ |
+| 2 | Database Layer — ConnectionManager, SchemaExtractor | ✅ |
+| 3 | Query Engine — execução real, preview, HITL gate | ✅ |
+| 4 | AI Integration — chat, suggest, analyze, context route | ✅ |
+| 4.5 | Tauri Desktop — sidecar, IPC, ícones, build pipeline | ✅ |
+| 5 | Polish & Security — testes automatizados, CI, docs | 🔄 Em progresso |
+
+---
+
+## Histórico de Versões
+
+| Versão | Data       | Mudanças |
+|--------|------------|----------|
+| 0.1.0  | 2025-03-25 | Backend scaffolding inicial |
+| 0.2.0  | 2025-03-25 | Frontend base, componentes, API client |
+| 0.3.0  | 2025-03-25 | Zustand, HITL modal, ConnectionModal, SQL highlighting |
+| 0.4.0  | 2026-03-25 | Tauri v2, backend completo (execução real + schema extractor), 29 testes, ícones |
+
+---
+
+**Last Updated**: 2026-03-25  
+**Version**: 0.4.0  
 **Author**: AI Agent (System Architecture)
